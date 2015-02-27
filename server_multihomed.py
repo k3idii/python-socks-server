@@ -1,4 +1,4 @@
-""" basic socks server """
+""" advanced socks server -> custom dns resolver + multiple output routes :) """
 import socket
 import select
 
@@ -18,7 +18,7 @@ import random
 import logging 
 import misc.loggerSetup
 
-CONFIG = [ dict(label="default", listen=("127.0.0.1",9051), bind_addr="127.0.0.2", xdns="127.0.0.1" )  ]
+CONFIG = [ dict(label="default", listen=("127.0.0.1",9051), bind_addr="127.0.0.2", dns="127.0.0.1" )  ]
 
 try:
   from local_config import CONFIG # import local settings
@@ -100,12 +100,16 @@ class routing5(s5srv):
 
 
 
+
+
 def processConnection(sock, addr, opt): # run this as thread ;)
   """ Handle new connection (as thread), pass to dispatcher """
   try:
     proxyDispatcher(sock, addr, v4class=routing4, v5class=routing5, meta=opt)
   except Exception as e:
     logging.error("Client-error: %s" % (`e`))
+
+
 
 def main():
   """ run me ;) """
