@@ -2,10 +2,14 @@
 
 import struct
 import logging 
+
 import pySocksBase
+from pySocksBase import socksException
+
 from misc.binBuffer import extStringIO
 
 SOCKS4_CMD_CONNECT = 1
+
 
 RESPONSE_CODE_GRANTED = 90
 RESPONSE_CODE_REJECTED = 91
@@ -36,36 +40,39 @@ class socksServer(pySocksBase.socksServer):
 
   def run(self):
     """ run service """
-    #data = self.client_socket.recv(pySocksBase.BLOCK_SIZE)
-    data = self.recvBlock()
+    data = self.client_socket.recv(1024)
+    if not data:
+      raise socksException("Fail to read from client !")
+
     stream = extStringIO(data)
     ver, cmd, port, binIp = stream.readFmt(">BBH4s")
 
     self.cmd = cmd
     if ver != self.version:
-      raise pySocksBase.socksException("Version mismatch : [ %d != 4 ]"%(ver))
+      raise socksException("Version mismatch : [ %d != 4 ]"%(ver))
 
     logging.info(" >> Got request [ ver:%d, cmd:0x%02X, port:%d ]" % (ver, cmd, port))
 
     numIp = struct.unpack(">i", binIp)[0]
     strIp = '.'.join(map(str, struct.unpack("BBBB", binIp)))
-    
-    dbgs=""
-    dbgs+="+----+----+-------+-----------------+\n"
-    dbgs+="| VN | CM | port  |     dst.ip.addr |\n"
-    dbgs+="+----+----+-------+-----------------+\n"
-    dbgs+="| %02X | %02X | %05d | %s |\n" % (ver, cmd, port, strIp.rjust(15))
-    dbgs+="+----+----+-------+-----------------+\n"
-    
+    if 1==1:
+      print
+      print "+----+----+-------+-----------------+"
+      print "| VN | CM | port  |     dst.ip.addr |"
+      print "+----+----+-------+-----------------+"
+      print "| %02X | %02X | %05d | %s |" % (ver, cmd, port, strIp.rjust(15))
+      print "+----+----+-------+-----------------+"
+      print
+
     userData = stream.readRest()
     user, extra = userData.split('\x00', 1)
 
-    logging.info("Provided credentials (username): [%s] " % (user))
+    logging.info("  Provided user: [%s] " % (user))
     self.user = user
 
     if numIp < 257:
       if extra[-1] != '\x00':
-        raise pySocksBase.socksException("Additional (hostname) data should be Null-term ! (is:%s"%(`data[:-1]`))
+        raise socksException("Additional (hostname) data should be Null-term ! (is:%s"%(`data[:-1]`))
       host = extra[:-1]
       logging.info("** SOCKS-4a")
     else:
@@ -94,9 +101,9 @@ class socksServer(pySocksBase.socksServer):
         reply = self.prepareServerReply(RESPONSE_CODE_CONERR)
         self.client_socket.send(reply)
         self.terminate()
-        logging.error("!! Fail to connect to target !!")
+        logging.info("!! Fail to connect to target !!")
         return
-      self.tcpForwardMode(self.client_socket, remote_socket)
+      self.tcp_forward(self.client_socket, remote_socket)
       self.terminate()
 
 

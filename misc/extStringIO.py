@@ -33,19 +33,19 @@ class extStringIO(StringIO):
       raise bufferException("Read error : need %d bytes, got %d " % ( n , len(d) ))
     return d
    
-  def readFmt(self,fmt="",into=None):
+  def read_fmt(self,fmt="",into=None):
     n = struct.calcsize(fmt)
     d = self.readN(n)
     return unpackEx(fmt,d,into) 
 
-  def readFmtSingle(self,fmt):
+  def read_fmt_single(self,fmt):
     v = self.readFmt(fmt)
     if v:
       return v[0]
     else:
       return None
 
-  def readRest(self):
+  def read_rest(self):
     s = self.getLen()
     p = self.getPos()
     d = s - p
@@ -57,13 +57,13 @@ class extStringIO(StringIO):
     self.write( data )
     self.seek(p)
 
-  def appendFmt(self,fmt,*a):
+  def append_fmt(self,fmt,*a):
     return self.append(struct.pack(fmt, *a) )
 
-  def writeFmt(self,fmt,*a):
+  def write_fmt(self,fmt,*a):
     return self.write( struct.pack(fmt , *a) )
   
-  def readAll(self):
+  def read_all(self):
     p = self.tell()
     self.seek(0)
     v = self.read()
@@ -73,20 +73,20 @@ class extStringIO(StringIO):
   def dump(self):
     return self.getvalue()
 
-  def getLen(self):  
+  def get_len(self):  
     org = self.tell()
     self.seek(0, os.SEEK_END)
     end = self.tell()
     self.seek(org)
     return end
 
-  def getPos(self):
+  def get_pos(self):
     return self.tell()
   
   def available(self):
     return self.getLen() - self.getPos()
 
-  def hexDump(self,inRow=16,title=None,head=True):
+  def hex_dump(self,inRow=16,title=None,head=True):
     S = ' \n'
     if head:
       if title:
@@ -110,21 +110,6 @@ class extStringIO(StringIO):
     S+= "`-- \n"
     self.seek(p)
     return S
-
-
-class _buffer:
-  pass
-
-
-
-class StringIO_buffer(_buffer):
-  
-  def setup(self):
-    pass
-
-  def readFunc(self,size=1024):
-    pass
-
 
 
 

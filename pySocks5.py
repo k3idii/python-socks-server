@@ -2,7 +2,10 @@
 
 import struct
 import logging 
+
 import pySocksBase
+from pySocksBase import socksException
+
 from misc.binBuffer import extStringIO
 
 
@@ -38,7 +41,7 @@ class socksServer(pySocksBase.socksServer):
     logging.info(" ~~~~~ SOCKS 5 ~~~~~~ ")
     self.version = 5
     self.authData = None
-    self.authPreferences = 0
+    self.authPreferences = SOCKS5_METHOD_NONE
 
   def selectAuthMethod(self, methods): # override this :)
     """ select one of provided auth methods """
@@ -55,9 +58,9 @@ class socksServer(pySocksBase.socksServer):
       try:
         return fn()
       except Exception as err:
-        raise pySocksBase.socksException("Fail to run auth method, reason: %s" % (`err`))
+        raise socksException("Fail to run auth method, reason: %s" % (`err`))
     else:
-      raise pySocksBase.socksException("authmethod [%s] not implemented !"%(funcName))
+      raise socksException("authmethod [%s] not implemented !"%(funcName))
   
   def processCommand(self, cmd):
     logging.info("Proccessing command 0x%02X" % (cmd))
@@ -66,11 +69,12 @@ class socksServer(pySocksBase.socksServer):
     fn = getattr(self, funcName, None)
     if fn and callable(fn):
       try:
-        return fn()
+        fn()
       except Exception as err:
-        raise pySocksBase.socksException("Fail to run command, reason: %s" % (`err`))
+        raise socksException("Fail to run command, reason: %s" % (`err`))
+      return True
     else:
-      raise pySocksBase.socksException("Command not implemented 0x%02X" % (cmd))
+      return False
 
   def auth_00(self):
     """ auth: none """
@@ -80,9 +84,7 @@ class socksServer(pySocksBase.socksServer):
   def auth_02(self):
     """ auth: user/password """
     logging.info("Auth method 0x02 (user/password")
-    #data = self.client_socket.recv(pySocksBase.BLOCK_SIZE)
-    data = self.recvBlock()
-    stream = extStringIO(data)
+    stream = extStringIO(self.client_socket.recv(1024))
     #print stream.hexDump()
     ver, uLen = stream.readFmt("BB")
     usr = ""
@@ -113,8 +115,7 @@ class socksServer(pySocksBase.socksServer):
 
   def run(self):
     """ run service """
-    #data = self.client_socket.recv(1024)
-    data = self.recvBlock()
+    data = self.client_socket.recv(1024)
     stream = extStringIO(data)
   
     ver, nMethods = stream.readFmt("BB")
@@ -138,8 +139,7 @@ class socksServer(pySocksBase.socksServer):
     
     # not terminated? ->auth ok ;)
 
-    #data = self.client_socket.recv(1024)
-    data = self.recvBlock()
+    data = self.client_socket.recv(1024)
     stream = extStringIO(data)
 
     ver, cmd, _, addrType = stream.readFmt("BBBB")
@@ -165,15 +165,17 @@ class socksServer(pySocksBase.socksServer):
       self.client_socket.send(self.prepareAnswer(SOCKS5_RESP_ADDRNOSUPP))
       self.terminate()
       raise Exception("Unsupported address type (%02X)" % (addrType))
-      #return False <- exception, no need to return 
+      #return False
     logging.info(" Target host:port ( %s : %d ) " % (host, port))
     self.target = (host, port)
     if self.processCommand(cmd):
       self.terminate()
-    else:
+      return True
+    else: # command not implemented !
       self.client_socket.send(self.prepareAnswer(SOCKS5_RESP_CMDNOSUPP))
       self.terminate()
-      logger.error("Command [%d] fail !"%cmd)
+      raise socksException("Command not implemented [%d]"%cmd)
+      #return False
 
   def command_01(self):
     """ connect """
@@ -182,17 +184,16 @@ class socksServer(pySocksBase.socksServer):
       logging.info("Unable to connect to [%s]" % (`self.target`))
       self.client_socket.send(self.prepareAnswer(SOCKS5_RESP_HOSTUNREACH))
       self.terminate()
-      return True
+      return
     self.client_socket.send(self.prepareAnswer(SOCKS5_RESP_SUCCESS))    
-    self.tcpForwardMode(self.client_socket, remote_socket)
+    self.tcp_forward(self.client_socket, remote_socket)
     self.terminate()
-    return True
 
   def command_02(self): # bind
     """ bind """
     logging.debug("SOCKD5-bind")
     logging.error("TO BE IMPLEMENTED!")
-    return True
+    pass
 
   def command_03(self): # udp
     """ udp assoc. """
@@ -201,6 +202,6 @@ class socksServer(pySocksBase.socksServer):
     # keep handling udp connections till tcp socket terminates 
     logging.error("TO BE IMPLEMENTED!")
     self.terminate()
-    return True
+    pass
 
 

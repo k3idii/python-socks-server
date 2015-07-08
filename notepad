@@ -1,8 +1,0 @@
-
-
-
-hg conifg for push: 
-[paths]
-default = https://user:pass@code.google.com/p/python-socks-server/
-
-
