@@ -1,24 +1,26 @@
 """ basic/minimalistic socks server """
 import SocketServer
-from dispatcher import proxyDispatcher 
-import misc.loggerSetup
+import logging
 
-listen_addr = ('127.0.0.1',9051)
+from dispatcher import socks_proxy_dispatcher
+import loggerSetup # <- way cooler logger output
 
 #Be less verbose:
-#import logging
-#misc.loggerSetup.stdLog.setLevel(logging.INFO)
+#loggerSetup.stdLog.setLevel(logging.INFO)
 
-class MyTCPHandler(SocketServer.BaseRequestHandler):
+class MyTcpHandler(SocketServer.BaseRequestHandler):
   def handle(self):
-    proxyDispatcher(self.request,self.client_address)
+    srv = socks_proxy_dispatcher(self.request,self.client_address, use_default=True)
+
+class MyTcpServer(SocketServer.TCPServer):
+  allow_reuse_address = True
 
 def main():
-  """ run me ;) """
-  srv = SocketServer.TCPServer(listen_addr, MyTCPHandler)
-  print "Listen on: %s" % (`listen_addr`)
+  listen_addr = ("127.0.0.1", 9876)
+  logging.info("Will listen on [{0}:{1}]".format(*listen_addr))
+  srv = MyTcpServer(listen_addr, MyTcpHandler)
   srv.serve_forever()
 
-#if __main__:
-main()
+if __name__ == '__main__':
+  main()
 

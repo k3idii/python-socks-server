@@ -3,9 +3,15 @@
 import socket
 import select
 
-import logging 
+import logging
 
 import re
+
+# CONST
+
+SOCKS_VERSION_4 = 4
+SOCKS_VERSION_5 = 5
+
 
 BLOCK_SIZE = 4096
 
@@ -14,18 +20,19 @@ LOCASE = re.compile("[a-z]+")
 SIDE_LOCAL = "LOCAL"
 SIDE_REMOTE = "REMOTE"
 
-
-class socksException(Exception):
+class SocksException(Exception):
   """ socs exception """
   pass
 
 
-class basicTcpForwarder(object): # hackable 
+class BasicTcpForwarder(object): 
+  """ hackable tcp forwarcer """
 
-  def __init__(self, local_socket, remote_socket, options=dict()):
+  def __init__(self, local_socket, remote_socket, options=None):
+    """ takes two sockets ... """
     self.l_sock = local_socket
     self.r_sock = remote_socket
-    self.options = options 
+    self.options = options if options else dict()
     self.endpoints = dict()
     self.endpoints[SIDE_LOCAL] = dict( sock=self.l_sock, other=SIDE_REMOTE )
     self.endpoints[SIDE_REMOTE] = dict( sock=self.r_sock, other=SIDE_LOCAL  )
@@ -47,7 +54,7 @@ class basicTcpForwarder(object): # hackable
     pass
 
   def run(self):
-    timeout = self.options.get('poll_time',0.05)
+    timeout = self.options.get('poll_time',0.05) 
     chunk_size = self.options.get('chunk_size',4096)
 
     logging.info("Start TCP forward mode -> ")
@@ -64,7 +71,7 @@ class basicTcpForwarder(object): # hackable
     keep_working = True
     while keep_working:
       there_was_event = False
-      events = queue.poll( timeout )
+      events = queue.poll( timeout * 1000 ) # seconds !!
       for fd, flag in events:
         if fd not in fds:
           logging.error("Unknown FD error at poll !")
@@ -77,15 +84,15 @@ class basicTcpForwarder(object): # hackable
         if flag & select.POLLIN:
           chunk = A['sock'].recv( chunk_size )
           if not chunk:
-            logging.info( 'Endpoint [ {} ] chunk is none, terminating ... '.format(name) )
+            logging.info("Endpoint [ {0} ] chunk is none, terminating ... ".format(name) )
             keep_working = False
             break
           chunk = self.process_chunk(name, chunk)
           if chunk: # process_chunk can return None ... handle this here :
-            logging.debug('Data from {} -> {}'.format(A['name'],B['name']))
+            logging.debug("Data from {0} -> {0}".format(A['name'],B['name']))
             B['sock'].send(chunk)
           else:
-            logging.debug('No chunk ...')
+            logging.debug("No chunk ...")
         else:
           logging.debug("UNKNOW EVENT")
       if not there_was_event:
@@ -98,14 +105,14 @@ class basicTcpForwarder(object): # hackable
  
 
 
-class socksServer(object):
+class SocksServer(object):
   """ x """
-  def __init__(self, client_socket, client_address, meta=None):
+  def __init__(self, client_socket, client_address, options=None):
     """ constructor """
     self.client_socket = client_socket
     self.client_address = client_address
-    self.meta = meta
-    logging.debug("Incoming connection from %s" % (`client_address`) )
+    self.options = options if options else dict()
+    logging.debug("Incoming connection from {0:s}:{1:d}".format(*client_address))
     self.setup()
     self.run()
 
@@ -115,7 +122,7 @@ class socksServer(object):
 
   def run(self):
     """ overload this """
-    pass
+    logging.error("I'm just prototype ... ")
 
   def terminate(self):
     """ close client connection """
@@ -127,21 +134,21 @@ class socksServer(object):
     sock.bind((host, port))
     return sock
 
-  def resolveHostname(self, host):
+  def resolve_hostname(self, host):
     """ use to resolve hostname """
-    logging.debug("Resolving [%s]" % (host))
+    logging.debug("Resolving [{0:s}]".format(host))
     return socket.gethostbyname(host)
 
   def isHostname(self, addr):
     """ check if address is hostname """
     if ":" in addr:
-      logging.debug("[%s] is IPv6 !" % (addr))
+      logging.debug("[{0:s}] is IPv6 !".format(addr))
       return False
     elif LOCASE.search(addr.lower()) is None:
-      logging.debug("[%s] is IPv4" % (addr))
+      logging.debug("[{0:s}] is IPv4".format(addr))
       return False
     else:
-      logging.debug("[%s] is hostname" % (addr))
+      logging.debug("[{0:s}] is hostname".format(addr))
       return True 
   
   def make_socket(self):
@@ -157,40 +164,44 @@ class socksServer(object):
     sock.connect( tgt )
     return sock
 
-  def connectTo(self, tgt):
+  def connect_to(self, tgt):
     """ establish connection to host|port """
     try:
       host, port = tgt
       if self.isHostname(host): 
-        logging.debug('target is not ip, resolving ...')
-        tmp = self.resolveHostname(host)
+        logging.debug("target is not ip, resolving ...")
+        tmp = self.resolve_hostname(host)
         if tmp is None:
-          logging.error("Fail to resolve [%s]" % (host))
+          logging.error("Fail to resolve [{0:s}]".format(host))
           return None
-        logging.debug("[%s] resolved to [%s]" % (host,tmp))
+        logging.debug("[{0:s}] resolved to [{1:s}]".format(host, tmp))
         host = tmp
         tgt = (host, port)
       else:
-        logging.debug("target [%s] is IP address, not resolving" % (host))
+        logging.debug("target [{0:s}] is IP address, not resolving".format(host))
       tgt = self.check_target(tgt)
+    except Exception as ex:
+      logging.error("[connect-to] Fail at pre-connect ({0:s})".format(`ex`))
+      return None
+    try:
       logging.debug("socket->new")
       sock = self.make_socket()
       logging.debug("socket->connect")
       self.socket_connect( sock, tgt )
-    except socket.error as sock_e:
-      logging.error("[connect-to] Socket-level error: %s!" % (`sock_e`))
-      return None
-    except socket.timeout as sock_e:
+    except socket.timeout :
       logging.error("[connect-to] Socket timeout ")
       return None
+    except socket.error as sock_e:
+      logging.error("[connect-to] Socket-level error: {0:s}!".format(`sock_e`))
+      return None
     except Exception as ex:
-      logging.error('[connect-to] Unknown error : {}'.format(`ex`))
+      logging.error("[connect-to] Unknown error : {}".format(`ex`))
       raise
     logging.debug("Connected !")
     return sock
 
   def tcp_forward(self, local_socket, remote_socket ):
-    dev = basicTcpForwarder( local_socket=local_socket, remote_socket=remote_socket )
+    dev = BasicTcpForwarder( local_socket=local_socket, remote_socket=remote_socket )
     dev.run()
 
 

@@ -1,6 +1,5 @@
 from StringIO import StringIO
 import struct
-import string
 import os
 
 CHUNK_SIZE = 1024
@@ -22,7 +21,7 @@ def unpack_ext(fmt,data,into=None):
   return dict( (into[i],t[i]) for i in range(len(into))  )  
 
 
-class bufferException(Exception):
+class BufferException(Exception):
   pass
 
 
@@ -30,7 +29,7 @@ class extStringIO(StringIO):
   def read_n(self,n):
     d = self.read(n)
     if not d or len(d) < n:
-      raise bufferException("Read error : need %d bytes, got %d " % ( n , len(d) ))
+      raise BufferException("Read error : need %d bytes, got %d " % ( n , len(d) ))
     return d
    
   def readFmt(self,fmt="",into=None):
@@ -47,8 +46,8 @@ class extStringIO(StringIO):
       return None
 
   def read_rest(self):
-    s = self.getLen()
-    p = self.getPos()
+    s = self.get_len()
+    p = self.get_pos()
     d = s - p
     return self.read_n(d)
  
@@ -68,7 +67,7 @@ class extStringIO(StringIO):
     p = self.tell()
     self.seek(0)
     v = self.read()
-    self.seep(p)
+    self.seek(p)
     return v
 
   def dump(self):
@@ -85,7 +84,7 @@ class extStringIO(StringIO):
     return self.tell()
   
   def available(self):
-    return self.getLen() - self.getPos()
+    return self.get_len() - self.get_pos()
 
   def hex_dump(self,in_row=16,group_by=1,title=None,head=True):
     n_groups = in_row / group_by
@@ -94,8 +93,8 @@ class extStringIO(StringIO):
     asc_size = in_row
     row_fmt = "| {0:10s} : {1:"+str(asc_size)+"} : {2:"+str(hex_size)+"}\n"
     
-    def fmt_row(a,b,c):
-      return row_fmt.format(a,b,c)
+    def fmt_row(xa,xb,xc):
+      return row_fmt.format(xa,xb,xc)
     
     def offset(a):
       return "{0:#010x}".format(a)
@@ -114,7 +113,7 @@ class extStringIO(StringIO):
       str_asc = ''
       hex_chunk = ''
       for c in map(ord,chunk):
-        str_asc += chr(c) if c >= 32 and c < 127 else '.'
+        str_asc += chr(c) if 32 <= c < 127 else '.'
         hex_chunk = "{0:02x}".format(c) + hex_chunk
         if len(hex_chunk) == group_by*2:
           str_hex += hex_chunk+' '
