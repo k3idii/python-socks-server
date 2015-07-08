@@ -30,12 +30,12 @@ class SocksServer(pySocksBase.SocksServer):
     """ setup """
     pass
 
-  def prepareServerReply(self, status, port=0, host="0.0.0.0"):
+  def prepare_server_reply(self, status, port=0, host="0.0.0.0"):
     """ prepare socks4 reply """
     packed_ip = struct.pack('BBBB', *map(int, host.split(".")))
     return struct.pack('>BBH', 0, status, port) + packed_ip
 
-  def verifyAccess(self):
+  def verify_access(self):
     """ verify access to socks """
     logging.info("Auth as : {0:s}".format(self.user))
     return True
@@ -44,14 +44,14 @@ class SocksServer(pySocksBase.SocksServer):
     """ run service """
     data = self.client_socket.recv(1024)
     if not data:
-      raise SocksException('Fail to read from client !')
+      raise Socks4Exception('Fail to read from client !')
 
     stream = extStringIO(data)
     ver, cmd, port, binIp = stream.readFmt('>BBH4s')
 
     self.cmd = cmd
     if ver != self.version:
-      raise SocksException("Version mismatch : [ {0:d} != 4 ]".format(ver))
+      raise Socks4Exception("Version mismatch : [ {0:d} != 4 ]".format(ver))
 
     logging.info(" >> Got request [ ver:{0:d}, cmd:0x{1:02X}, port:{2:d} ]".format(ver, cmd, port))
 
@@ -74,7 +74,7 @@ class SocksServer(pySocksBase.SocksServer):
 
     if numIp < 257:
       if extra[-1] != '\x00':
-        raise SocksException("Additional (hostname) data should be Null-term ! (is:{0:s}".format(`data[:-1]`))
+        raise Socks4Exception("Additional (hostname) data should be Null-term ! (is:{0:s}".format(`data[:-1]`))
       host = extra[:-1]
       logging.info("** SOCKS-4a")
     else:
@@ -87,20 +87,20 @@ class SocksServer(pySocksBase.SocksServer):
     logging.info(">> Target-host : {0:s}".format(`self.target`))
   
     
-    if not self.verifyAccess():
+    if not self.verify_access():
       logging.info(" !! client rejected !!")
-      reply = self.prepareServerReply(RESPONSE_CODE_REJECTED)
+      reply = self.prepare_server_reply(RESPONSE_CODE_REJECTED)
       self.client_socket.send(reply)
       self.terminate()
       return
     #else:
-    reply = self.prepareServerReply(RESPONSE_CODE_GRANTED)
+    reply = self.prepare_server_reply(RESPONSE_CODE_GRANTED)
     self.client_socket.send(reply) 
 
     if self.cmd == SOCKS4_CMD_CONNECT:
       remote_socket = self.connect_to(self.target)
       if remote_socket is None:
-        reply = self.prepareServerReply(RESPONSE_CODE_CONERR)
+        reply = self.prepare_server_reply(RESPONSE_CODE_CONERR)
         self.client_socket.send(reply)
         self.terminate()
         logging.info("!! Fail to connect to target !!")

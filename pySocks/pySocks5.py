@@ -153,10 +153,10 @@ class SocksServer(pySocksBase.SocksServer):
     host = None
     port = -1
     if addrType == SOCKS5_ADDR_IP4:
-      binIp, port = stream.readFmt('>4sH')
-      host = '.'.join(map(str, struct.unpack('BBBB', binIp)))
+      bin_ip, port = stream.readFmt('>4sH')
+      host = '.'.join(map(str, struct.unpack('BBBB', bin_ip)))
     elif addrType == SOCKS5_ADDR_IP6:
-      binIp, port = stream.readFmt('>16sH')
+      bin_ip, port = stream.readFmt('>16sH')
       raise Exception("Implement me lol ( ipv6 <3 )")
     elif addrType == SOCKS5_ADDR_DOMAIN:
       size = stream.readFmt_single('B')
